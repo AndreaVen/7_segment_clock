@@ -15,11 +15,13 @@ unsigned short min;
 unsigned short hour;
 short int leftButton=7;
 short int centerButton=8;
-short int rightButton=10;
-bool debug=true;
+short int rightButton=9;
+bool debug=false;
 int maxModes=1; // number of functionality of the clock
 long currentMills;
+unsigned long startingMillis=0;
 bool firstEnter=1; // used in millis function to sync arduino millis and current second
+
 
 /*
   overloading of a method print to easily debug the code    
@@ -71,7 +73,7 @@ void setup() {
   pinMode(leftButton,INPUT);
   pinMode(rightButton,INPUT);
   pinMode(centerButton,INPUT);
- // rtc.setTime(13,10,00); // set time for the first time
+  //rtc.setTime(15,27,00); // set time for the first time
 lc.setIntensity(0,12);
 lc.clearDisplay(0);
 }
@@ -100,15 +102,17 @@ lc.setDigit(0,(int) (startingDigit+1), (int) (number%10),dp); // second digit
 }
 
 // check the buttons and uptade the current state (functionality of the clock)
-bool checkButtons()
+void checkButtons()
 {
-  print((String)"checking buttons");
   bool left = digitalRead(leftButton);
   bool right = digitalRead(rightButton);
   bool center = digitalRead(centerButton);
   if (right == 0)
   {
-    delay(100);
+    print( (String)"Right");
+    print((String)"old state= "+state);
+  lc.clearDisplay(0);
+    delay(300);
     if (state < maxModes)
     {
       state++;
@@ -117,11 +121,18 @@ bool checkButtons()
     {
       state = 0;
     }
+        print((String)"new state= "+state);
+
   }
   else if (left == 0)
   {
-        delay(100);
-    if (state > 1)
+    print((String)"left");
+            print((String)"old state= "+state);
+
+    lc.clearDisplay(0);
+
+        delay(300);
+    if (state > 0)
     {
       state--;
     }
@@ -129,10 +140,15 @@ bool checkButtons()
     {
       state = maxModes;
     }
+            print((String)"new state= "+state);
+
   }
   else if (center == 0)
   {
-        delay(100);
+      print((String)"center");
+    lc.clearDisplay(0);
+
+        delay(300);
     // enter mode that changes the current time
   }
 }
@@ -152,49 +168,69 @@ void displayCurrentTimeWithMillis(bool firstEnter){
   sec=t.sec;
   min=t.min;
   hour=t.hour;
+
   if (firstEnter){
-    currentMills=0;
-    firstEnter=0;
+    startingMillis=millis();
+    displayNumber((unsigned short)6,(unsigned short)0);
+    currentMills=millis();
   }
   else{
-    currentMills=millis();
+    currentMills=millis()-startingMillis; 
+    displayNumber((unsigned short)6,(unsigned short)currentMills/10);
   }
   displayNumber((unsigned short)0,hour); 
   displayNumber((unsigned short)2,min);
   displayNumber((unsigned short)4,sec);
-  displayNumber((unsigned short)6,(unsigned short)currentMills/10);
-  print((String)"current mills="+(unsigned short)currentMills/10) ;
   checkButtons();
+  
 }
 
 void loop()
 {
   unsigned short currentSecond = rtc.getTime().sec;
   while(1){
-
- print((String)"current state: "+state);
   if (state == 0)
     { // initial state, normal clock
       // display current time
       if (rtc.getTime().sec==currentSecond)
         {
           // check state pin, luminosity, and other settings
+          displayCurrentTime();
           checkButtons();
+          
         }
       else
         {
-          displayCurrentTime();
-        currentSecond=rtc.getTime().sec;
+        displayCurrentTime();
         }
+        currentSecond=rtc.getTime().sec;
+
     }
     else if (state==1){
-      displayCurrentTimeWithMillis(firstEnter);
-      currentSecond=rtc.getTime().sec;
+      if (rtc.getTime().sec==currentSecond) // the second has not yet changed
+        {
+      displayCurrentTimeWithMillis(firstEnter); // first enter =1 by default
       firstEnter=0;
+        }
+      else
+        {
+        checkButtons();
+        displayCurrentTime();
+        firstEnter=1;
+        displayCurrentTimeWithMillis(firstEnter); // first enter =1 by default
+        firstEnter=0;
+        currentSecond=rtc.getTime().sec;
+        }
+        
+
+    }
+
+
+
   }
   }
 
 
-}
+
 
 
