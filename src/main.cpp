@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <DS1302.h>
 #include <LedControl.h>
+void chek_and_set_time_down(short int );
+void chek_and_set_time_up(short int );
 
 
 
@@ -16,10 +18,12 @@ unsigned short hour;
 short int leftButton=7;
 short int centerButton=8;
 short int rightButton=9;
-bool debug=false;
+bool debug=true;
 int maxModes=1; // number of functionality of the clock
 long currentMills;
 unsigned long startingMillis=0;
+short int central_button_counter=0; // once the hour and minutes has been set you can resume normal mode
+
 bool firstEnter=1; // used in millis function to sync arduino millis and current second
 
 
@@ -32,16 +36,8 @@ void print(String s){
     Serial.println(s);
   }
 }
-void print(bool b){
-  if (debug==true){
-    Serial.println(b);
-  }
-}
-void print(float f){
-  if (debug==true){
-    Serial.println(f);
-  }
-}
+
+
 void print(long l){
   if (debug==true){
     Serial.println(l);
@@ -102,6 +98,37 @@ lc.setDigit(0,(int) (startingDigit+1), (int) (number%10),dp); // second digit
 }
 
 // check the buttons and uptade the current state (functionality of the clock)
+
+bool check_right(){
+  int right = digitalRead(rightButton);
+  if (right==0){
+    return true;
+  }
+  else{
+    return false;
+  }
+}
+bool check_left(){
+  int left =digitalRead(leftButton);
+  if (left==0){
+    return true;
+  }
+  else{
+    return false;
+  }
+}
+void check_center(){
+bool center = digitalRead(centerButton);
+  if (center==0){
+    central_button_counter++;
+    print("aumentato center counter =");
+    Serial.println(central_button_counter);
+    delay(300);
+  }
+}
+
+
+
 void checkButtons()
 {
   bool left = digitalRead(leftButton);
@@ -146,11 +173,155 @@ void checkButtons()
   else if (center == 0)
   {
       print((String)"center");
-    lc.clearDisplay(0);
-
-        delay(300);
+      lc.clearDisplay(0);
+      state=3;
+      delay(300);
     // enter mode that changes the current time
   }
+}
+void blink_on(short int startingDigit){
+  long unsigned int now=millis();
+  unsigned int time_on=1000;
+  while(millis()-now<time_on){
+    t=rtc.getTime();
+    sec=t.sec;
+    min=t.min;
+    hour=t.hour;
+    displayNumber((unsigned short)0,hour); 
+    displayNumber((unsigned short)2,min);
+    chek_and_set_time_up(startingDigit);
+    chek_and_set_time_down(startingDigit);
+  }
+}
+int format_hour(int increment){
+  if (increment>0){
+    if (rtc.getTime().hour>22){ // it means now is 23:XX I have to set 00:XX
+      return 0;
+    }
+    else{
+      return rtc.getTime().hour+1;
+    }
+  }
+  else{
+        if (rtc.getTime().hour==0){ // it means now is 00:XX I have to set 23:XX
+      return 23;
+    }
+    else{
+      return rtc.getTime().hour-1;
+    }
+  }
+}
+int format_minutes(int increment){
+if (increment>0){
+    if (rtc.getTime().min==59){ // it means now is XX:59I have to set XX:00
+      return 0;
+    }
+    else{
+      return rtc.getTime().min+1;
+    }
+  }
+  else{
+        if (rtc.getTime().min==0){ // it means now is XX:00 I have to set XX:59
+      return 59;
+    }
+    else{
+      return rtc.getTime().min-1;
+    }
+  }
+
+
+}
+
+
+void chek_and_set_time_up(short int startingDigit){
+  if (check_right()){
+    t=rtc.getTime();
+    min=t.min;
+    hour=t.hour;
+    sec=t.sec;
+    if (startingDigit==0){ // setting hour
+      int new_hour= format_hour(1);
+      rtc.setTime(new_hour,min,sec); // set time hh:mm:ss
+    }
+    else if (startingDigit==1){ // setting minutes
+      int new_minute=format_minutes(1);
+      rtc.setTime(hour,new_minute,sec);
+    }
+    delay(300);
+  }
+  check_center();
+
+}
+
+void chek_and_set_time_down(short int startingDigit){
+  if (check_left()){
+    t=rtc.getTime();
+    min=t.min;
+    hour=t.hour;
+    sec=t.sec;
+    if (startingDigit==0){ // setting hour
+      int new_hour= format_hour(-1);
+      rtc.setTime(new_hour,min,sec); // set time hh:mm:ss
+    }
+    else if (startingDigit==1){ // setting minutes
+      int new_minute=format_minutes(-1);
+      rtc.setTime(hour,new_minute,sec);
+    }
+
+    delay(300);
+    
+  }
+      check_center();
+
+}
+
+
+void  display_noting(short int startingDigit){
+// display only the time NOT on the starting digit i.e if startingDigit=0 the function displays the minutes but not the hours
+lc.clearDisplay(0);
+long unsigned int now=millis();
+unsigned int time_on=150;
+while(millis()-now<time_on){
+  t=rtc.getTime();
+  sec=t.sec;
+  min=t.min;
+  hour=t.hour;
+  if (startingDigit==0){
+    displayNumber((unsigned short)2,min);
+  }
+  else if (startingDigit==1){
+    displayNumber((unsigned short)0,hour); 
+  }
+  chek_and_set_time_up(startingDigit);
+  chek_and_set_time_down(startingDigit);
+
+}
+}
+
+
+
+void blink_off(short int startingDigit){
+  display_noting(startingDigit);
+
+}
+
+
+
+
+
+void set_time()
+{ 
+  print("iniziato set_time");
+  while(central_button_counter<2){
+    print("ancora in set time causa valore counter=");
+    Serial.println(central_button_counter);
+    blink_on(central_button_counter);
+    blink_off(central_button_counter);
+  }
+  print("uscendo da set time");
+  state=1;
+  central_button_counter=0; // once the hour and minutes has been set you can resume normal mode
+
 }
 
 void displayCurrentTime(){
@@ -222,6 +393,16 @@ void loop()
         currentSecond=rtc.getTime().sec;
         }
         
+
+    }
+    else if (state==3){ // enter time setting mode
+        //printa i minuti sempre, 
+        //tieni l'ora accesa per 1 secondo e spegnila per 0.2 secondi 
+        //quando viene ripremuto il tasto centrale vai ai minuti
+        // quando viene premuto su vai ora più, ricordando che a 24 devi cambiare.
+        // quando viene premuto giù vai meno ricordano che non puoi andare a 0
+        set_time();
+
 
     }
 
