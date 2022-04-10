@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <DS1302.h>
 #include <LedControl.h>
+#include <DHT.h>
 void chek_and_set_time_down(short int );
 void chek_and_set_time_up(short int );
 
@@ -10,6 +11,9 @@ void chek_and_set_time_up(short int );
 DS1302 rtc(5, 3, 13); // RST, DAT, CLOCK
 LedControl lc=LedControl(12,11,10,1); // din(miso),clock(mosi),csLoad
 
+#define DHTPIN 2     // what pin we're connected to
+#define DHTTYPE DHT22   // DHT22
+DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 unsigned short state=0;
 Time t;
 unsigned short sec;
@@ -19,7 +23,7 @@ short int leftButton=7;
 short int centerButton=8;
 short int rightButton=9;
 bool debug=true;
-int maxModes=1; // number of functionality of the clock
+int maxModes=2; // number of functionality of the clock
 long currentMills;
 unsigned long startingMillis=0;
 short int central_button_counter=0; // once the hour and minutes has been set you can resume normal mode
@@ -65,6 +69,7 @@ void setup() {
   rtc.halt(false);
   rtc.writeProtect(false);
   Serial.begin(9600);
+  dht.begin();  
   lc.shutdown(0,false);
   pinMode(leftButton,INPUT);
   pinMode(rightButton,INPUT);
@@ -86,6 +91,7 @@ displayNumber(0,12)
 displays the number 1 on the digit 0 and the number 2 on the following digit (1) 
 */
 void displayNumber(unsigned short startingDigit,unsigned short number){
+//todo prendere in input l'opzione dp così da poter usare il metodo anche con la temperatura ed umidità
 lc.setDigit(0,(int) startingDigit, (int) number/10,false); // first digit
 bool dp;
 if (startingDigit<4){
@@ -174,7 +180,7 @@ void checkButtons()
   {
       print((String)"center");
       lc.clearDisplay(0);
-      state=3;
+      state=42;
       delay(300);
     // enter mode that changes the current time
   }
@@ -395,7 +401,13 @@ void loop()
         
 
     }
-    else if (state==3){ // enter time setting mode
+    else if (state==3){
+        //display temp and humidity 
+        float hum = dht.readHumidity();
+        float temp= dht.readTemperature();
+        //todo separare parte intera e parte frazionaria con un punto 
+    }
+    else if (state==43){ // enter time setting mode
         //printa i minuti sempre, 
         //tieni l'ora accesa per 1 secondo e spegnila per 0.2 secondi 
         //quando viene ripremuto il tasto centrale vai ai minuti
