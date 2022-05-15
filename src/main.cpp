@@ -23,11 +23,12 @@ short int leftButton=7;
 short int centerButton=8;
 short int rightButton=9;
 bool debug=true;
-int maxModes=2; // number of functionality of the clock
+int maxModes=3; // number of functionality of the clock
 long currentMills;
 unsigned long startingMillis=0;
 short int central_button_counter=0; // once the hour and minutes has been set you can resume normal mode
-
+float oldTemp=0;
+int oldHum=0;
 bool firstEnter=1; // used in millis function to sync arduino millis and current second
 
 
@@ -91,9 +92,11 @@ displayNumber(0,12)
 displays the number 1 on the digit 0 and the number 2 on the following digit (1) 
 */
 void displayNumber(unsigned short startingDigit,unsigned short number,bool dp){
-//todo prendere in input l'opzione dp così da poter usare il metodo anche con la temperatura ed umidità
-lc.setDigit(0,(int) startingDigit, (int) number/10,false); // first digit
-lc.setDigit(0,(int) (startingDigit+1), (int) (number%10),dp); // second digit
+  //todo prendere in input l'opzione dp così da poter usare il metodo anche con la temperatura ed umidità
+  lc.setDigit(0,(int) startingDigit, (int) number/10,false); // first digit
+  if (startingDigit<7){
+    lc.setDigit(0,(int) (startingDigit+1), (int) (number%10),dp); // second digit
+  }
 }
 
 // check the buttons and uptade the current state (functionality of the clock)
@@ -128,7 +131,7 @@ bool center = digitalRead(centerButton);
 
 
 
-void checkButtons()
+bool checkButtons()
 {
   bool left = digitalRead(leftButton);
   bool right = digitalRead(rightButton);
@@ -148,7 +151,7 @@ void checkButtons()
       state = 0;
     }
         print((String)"new state= "+state);
-
+    return true;
   }
   else if (left == 0)
   {
@@ -167,7 +170,7 @@ void checkButtons()
       state = maxModes;
     }
             print((String)"new state= "+state);
-
+    return true;
   }
   else if (center == 0)
   {
@@ -175,7 +178,11 @@ void checkButtons()
       lc.clearDisplay(0);
       state=42;
       delay(300);
+      return true;
     // enter mode that changes the current time
+  }
+  else{
+    return false;
   }
 }
 void blink_on(short int startingDigit){
@@ -354,6 +361,116 @@ void displayCurrentTimeWithMillis(bool firstEnter){
   checkButtons();
   
 }
+ void displayTemperatureAndTime(){
+  t=rtc.getTime();
+  min=t.min;
+  hour=t.hour;
+  displayNumber((unsigned short)0,hour,true); 
+  displayNumber((unsigned short)2,min,false);
+
+  if (oldTemp< 1){ // if this is the first time entering the method just print the instant temperature
+    float temp= dht.readTemperature();
+    int integer= floor(temp); 
+    int decimal= int((temp-integer)*100);
+    Serial.print("old: ");
+    Serial.println(oldTemp);
+    displayNumber((unsigned short)5,integer,true);
+    displayNumber((unsigned short)7,decimal,false);
+    oldTemp=temp;
+  }
+  else
+  {
+    int integer= floor(oldTemp); 
+    int decimal= int((oldTemp-integer)*100);
+    displayNumber((unsigned short)5,integer,true);
+    displayNumber((unsigned short)7,decimal,false);
+    long startTime=millis();
+    float meanTemperature=dht.readTemperature();
+    int n=1;
+    while(millis()-startTime<20000 && !checkButtons()){ // update every X seconds or when a button is pressed
+      n++;
+      meanTemperature = meanTemperature*(n-1)/n + meanTemperature/n; // iterative mean
+      delay(10);
+
+    }
+    Serial.println(meanTemperature);
+    float temp= meanTemperature;
+    oldTemp=temp;
+    integer= floor(temp); 
+    decimal= int((temp-integer)*100);
+    displayNumber((unsigned short)5,integer,true);
+    displayNumber((unsigned short)7,decimal,false);
+
+  }
+ 
+ 
+
+
+
+ }
+ 
+ void displayTemperatureAndHumidity(){
+  
+
+  if (oldTemp< 1 || oldHum<1){ // if this is the first time entering the method just print the instant temperature
+    float temp= dht.readTemperature();
+    int hum=dht.readHumidity();
+
+    int integer= floor(temp); 
+    int decimal= int((temp-integer)*100);
+  
+
+          displayNumber((unsigned short)0,integer,true);
+
+                lc.setDigit(0,(int) 2, (int) decimal/10,false); // first digit
+
+              lc.setChar(0,3,'C',false);
+              displayNumber((unsigned short)5,hum,false);
+              lc.setChar(0,7,'H',false);
+
+    oldTemp=temp;
+    oldHum=hum;
+  }
+  else
+  {
+    int integer= floor(oldTemp); 
+    int decimal= int((oldTemp-integer)*100);
+    int hum=dht.readHumidity();
+    Serial.print("hum is ");
+    Serial.println(hum);
+    displayNumber((unsigned short)0,integer,true);
+     Serial.print("decimal is ");
+    Serial.println(decimal);
+    lc.setDigit(0,2,decimal,false); 
+    displayNumber((unsigned short)5,hum,false);
+
+    long startTime=millis();
+    float meanTemperature=dht.readTemperature();
+    float meanHum=dht.readHumidity();
+    int n=1;
+    while(millis()-startTime<20000 && !checkButtons()){ // update every X seconds or when a button is pressed
+      n++;
+      meanTemperature = meanTemperature*(n-1)/n + meanTemperature/n; // iterative mean
+      meanHum=meanHum*(n-1)/n + meanHum/n;
+      delay(10);
+
+    }
+    Serial.println(meanTemperature);
+    float temp= meanTemperature;
+    oldHum=meanHum;
+    oldTemp=temp;
+    oldHum=hum;
+    integer= floor(temp); 
+    decimal= int((temp-integer)*100);
+    displayNumber((unsigned short)0,integer,true);
+
+      lc.setDigit(0,(int) 2, (int) decimal/10,false); // first digit
+
+    lc.setChar(0,3,'C',false);
+    displayNumber((unsigned short)5,hum,false);
+    lc.setChar(0,7,'H',false);
+
+ }}
 
 void loop()
 {
@@ -394,11 +511,17 @@ void loop()
         
 
     }
-    else if (state==3){
-        //display temp and humidity 
-        float hum = dht.readHumidity();
-        float temp= dht.readTemperature();
+    else if (state==2){
+        displayTemperatureAndTime();
+        checkButtons();
+
         //todo separare parte intera e parte frazionaria con un punto 
+    }
+    else if (state==3){
+      displayTemperatureAndHumidity();
+      checkButtons();
+
+
     }
     else if (state==42){ // enter time setting mode
         //printa i minuti sempre, 
