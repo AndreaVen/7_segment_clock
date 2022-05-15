@@ -90,16 +90,9 @@ example:
 displayNumber(0,12)
 displays the number 1 on the digit 0 and the number 2 on the following digit (1) 
 */
-void displayNumber(unsigned short startingDigit,unsigned short number){
+void displayNumber(unsigned short startingDigit,unsigned short number,bool dp){
 //todo prendere in input l'opzione dp così da poter usare il metodo anche con la temperatura ed umidità
 lc.setDigit(0,(int) startingDigit, (int) number/10,false); // first digit
-bool dp;
-if (startingDigit<4){
-   dp=true;
-}
-else{
-   dp =false;
-}
 lc.setDigit(0,(int) (startingDigit+1), (int) (number%10),dp); // second digit
 }
 
@@ -193,8 +186,8 @@ void blink_on(short int startingDigit){
     sec=t.sec;
     min=t.min;
     hour=t.hour;
-    displayNumber((unsigned short)0,hour); 
-    displayNumber((unsigned short)2,min);
+    displayNumber((unsigned short)0,hour,false); 
+    displayNumber((unsigned short)2,min,true);
     chek_and_set_time_up(startingDigit);
     chek_and_set_time_down(startingDigit);
   }
@@ -293,10 +286,10 @@ while(millis()-now<time_on){
   min=t.min;
   hour=t.hour;
   if (startingDigit==0){
-    displayNumber((unsigned short)2,min);
+    displayNumber((unsigned short)2,min,true);
   }
   else if (startingDigit==1){
-    displayNumber((unsigned short)0,hour); 
+    displayNumber((unsigned short)0,hour,true); 
   }
   chek_and_set_time_up(startingDigit);
   chek_and_set_time_down(startingDigit);
@@ -335,9 +328,9 @@ void displayCurrentTime(){
   sec=t.sec;
   min=t.min;
   hour=t.hour;
-  displayNumber((unsigned short)0,hour); 
-  displayNumber((unsigned short)2,min);
-  displayNumber((unsigned short)4,sec);
+  displayNumber((unsigned short)0,hour,true); 
+  displayNumber((unsigned short)2,min,true);
+  displayNumber((unsigned short)4,sec,false);
 }
 
 void displayCurrentTimeWithMillis(bool firstEnter){
@@ -348,16 +341,16 @@ void displayCurrentTimeWithMillis(bool firstEnter){
 
   if (firstEnter){
     startingMillis=millis();
-    displayNumber((unsigned short)6,(unsigned short)0);
+    displayNumber((unsigned short)6,(unsigned short)0,false);
     currentMills=millis();
   }
   else{
     currentMills=millis()-startingMillis; 
-    displayNumber((unsigned short)6,(unsigned short)currentMills/10);
+    displayNumber((unsigned short)6,(unsigned short)currentMills/10,false);
   }
-  displayNumber((unsigned short)0,hour); 
-  displayNumber((unsigned short)2,min);
-  displayNumber((unsigned short)4,sec);
+  displayNumber((unsigned short)0,hour,true); 
+  displayNumber((unsigned short)2,min,true);
+  displayNumber((unsigned short)4,sec,false);
   checkButtons();
   
 }
@@ -407,15 +400,13 @@ void loop()
         float temp= dht.readTemperature();
         //todo separare parte intera e parte frazionaria con un punto 
     }
-    else if (state==43){ // enter time setting mode
+    else if (state==42){ // enter time setting mode
         //printa i minuti sempre, 
         //tieni l'ora accesa per 1 secondo e spegnila per 0.2 secondi 
         //quando viene ripremuto il tasto centrale vai ai minuti
         // quando viene premuto su vai ora più, ricordando che a 24 devi cambiare.
         // quando viene premuto giù vai meno ricordano che non puoi andare a 0
         set_time();
-
-
     }
 
 
