@@ -4,6 +4,8 @@
 #include <DHT.h>
 void chek_and_set_time_down(short int );
 void chek_and_set_time_up(short int );
+void check_and_set_light_up();
+void check_and_set_light_down();
 
 
 
@@ -22,14 +24,17 @@ unsigned short hour;
 short int leftButton=7;
 short int centerButton=8;
 short int rightButton=9;
+short int lux_pin=2;
 bool debug=true;
-int maxModes=3; // number of functionality of the clock
+int maxModes=4; // number of functionality of the clock
 long currentMills;
 unsigned long startingMillis=0;
 short int central_button_counter=0; // once the hour and minutes has been set you can resume normal mode
 float oldTemp=0;
 int oldHum=0;
 bool firstEnter=1; // used in millis function to sync arduino millis and current second
+int light_status=12; // 0=auto
+int number_of_light_mode=15;
 
 
 /*
@@ -75,8 +80,9 @@ void setup() {
   pinMode(leftButton,INPUT);
   pinMode(rightButton,INPUT);
   pinMode(centerButton,INPUT);
+  pinMode(A2,INPUT);
   //rtc.setTime(15,27,00); // set time for the first time
-lc.setIntensity(0,12);
+lc.setIntensity(0,light_status);
 lc.clearDisplay(0);
 }
 
@@ -185,7 +191,7 @@ bool checkButtons()
     return false;
   }
 }
-void blink_on(short int startingDigit){
+void blink_time_on(short int startingDigit){
   long unsigned int now=millis();
   unsigned int time_on=1000;
   while(millis()-now<time_on){
@@ -199,6 +205,19 @@ void blink_on(short int startingDigit){
     chek_and_set_time_down(startingDigit);
   }
 }
+void  display_light_status(){
+displayNumber(1,light_status,false);  // mostrar
+}
+void blink_light_on(short int startingDigit){
+  long unsigned int now=millis();
+  unsigned int time_on=1000;
+  while(millis()-now<time_on){
+display_light_status();
+    check_and_set_light_up();
+    check_and_set_light_down();
+  }
+}
+
 int format_hour(int increment){
   if (increment>0){
     if (rtc.getTime().hour>22){ // it means now is 23:XX I have to set 00:XX
@@ -259,6 +278,72 @@ void chek_and_set_time_up(short int startingDigit){
 
 }
 
+void set_light_auto(){
+// 3 levels of luminosity: high, normal and low.
+int lux=analogRead(lux_pin);
+if (lux>300 && lux<600){
+  lc.setIntensity(0,12);
+}
+if (lux<150){
+  lc.setIntensity(0,3);
+}
+if (lux>700){
+  lc.setIntensity(0,15);
+}
+
+
+}
+
+void set_light_status(){
+  if (light_status>0)
+  {
+    lc.setIntensity(0,light_status);
+  }
+  else if (light_status==0){
+    Serial.println("livello 0");
+    set_light_auto();
+  }
+
+
+}
+
+
+void check_and_set_light_up(){
+if (check_right()){
+   if (light_status<number_of_light_mode){
+    light_status++;
+set_light_status();
+display_light_status();
+   }
+   else{
+    light_status=0;
+set_light_status();
+display_light_status();
+
+   } 
+     delay(300);
+  }
+  check_center();
+}
+
+
+void check_and_set_light_down(){
+if (check_left()){
+   if (light_status>0){
+    light_status--;
+set_light_status();
+display_light_status();
+   }
+   else{
+    light_status=number_of_light_mode;
+set_light_status();
+display_light_status();
+   } 
+    delay(300);
+  }
+  check_center();
+}
+
 void chek_and_set_time_down(short int startingDigit){
   if (check_left()){
     t=rtc.getTime();
@@ -311,6 +396,18 @@ void blink_off(short int startingDigit){
 
 }
 
+void blink_light_off() {
+lc.clearDisplay(0);
+long unsigned int now=millis();
+unsigned int time_on=150;
+while(millis()-now<time_on){
+  lc.setChar(0,0,'L',true);
+  check_center();
+  check_and_set_light_down();
+  check_and_set_light_up();
+  } 
+}
+
 
 
 
@@ -318,13 +415,31 @@ void blink_off(short int startingDigit){
 void set_time()
 { 
   print("iniziato set_time");
+  lc.clearDisplay(0);
   while(central_button_counter<2){
     print("ancora in set time causa valore counter=");
     Serial.println(central_button_counter);
-    blink_on(central_button_counter);
+    blink_time_on(central_button_counter);
     blink_off(central_button_counter);
   }
   print("uscendo da set time");
+  state=1;
+  central_button_counter=0; // once the hour and minutes has been set you can resume normal mode
+
+}
+
+
+void set_light(){
+  print("iniziato set_light");
+  lc.clearDisplay(0);
+  while(central_button_counter<1){
+    lc.setChar(0,0,'L',true);
+    print("ancora in set light causa valore counter=");
+    Serial.println(central_button_counter);
+    blink_light_on(central_button_counter);
+    blink_light_off();
+  }
+  print("uscendo da set light");
   state=1;
   central_button_counter=0; // once the hour and minutes has been set you can resume normal mode
 
@@ -476,6 +591,7 @@ void loop()
 {
   unsigned short currentSecond = rtc.getTime().sec;
   while(1){
+  set_light_status();
   if (state == 0)
     { // initial state, normal clock
       // display current time
@@ -520,6 +636,13 @@ void loop()
     else if (state==3){
       displayTemperatureAndHumidity();
       checkButtons();
+
+
+    }
+
+       else if (state==4){
+     set_light();
+     Serial.println(analogRead(2));
 
 
     }
