@@ -1,23 +1,23 @@
 #include <Arduino.h>
-#include <DS1302.h>
 #include <LedControl.h>
 #include <DHT.h>
+#include "uRTCLib.h"
+
 void chek_and_set_time_down(short int );
 void chek_and_set_time_up(short int );
 void check_and_set_light_up();
 void check_and_set_light_down();
+uRTCLib rtc;
 
 
 
 
-DS1302 rtc(5, 3, 13); // RST, DAT, CLOCK
 LedControl lc=LedControl(12,11,10,1); // din(miso),clock(mosi),csLoad
 
 #define DHTPIN 2     // what pin we're connected to
 #define DHTTYPE DHT22   // DHT22
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 unsigned short state=0;
-Time t;
 unsigned short sec;
 unsigned short min;
 unsigned short hour;
@@ -72,8 +72,7 @@ void print(double d){
 
 
 void setup() {
-  rtc.halt(false);
-  rtc.writeProtect(false);
+  Wire.begin();
   Serial.begin(9600);
   dht.begin();  
   lc.shutdown(0,false);
@@ -81,7 +80,11 @@ void setup() {
   pinMode(rightButton,INPUT);
   pinMode(centerButton,INPUT);
   pinMode(A2,INPUT);
-  //rtc.setTime(15,27,00); // set time for the first time
+  URTCLIB_WIRE.begin();
+  // for example to set January 13 2022 at 12:56 you would call:
+  rtc.set_rtc_address(0x68);
+
+
 lc.setIntensity(0,light_status);
 lc.clearDisplay(0);
 }
@@ -195,10 +198,10 @@ void blink_time_on(short int startingDigit){
   long unsigned int now=millis();
   unsigned int time_on=1000;
   while(millis()-now<time_on){
-    t=rtc.getTime();
-    sec=t.sec;
-    min=t.min;
-    hour=t.hour;
+    rtc.refresh();
+    sec=rtc.second();
+    min=rtc.minute();
+    hour=rtc.hour();
     displayNumber((unsigned short)0,hour,false); 
     displayNumber((unsigned short)2,min,true);
     chek_and_set_time_up(startingDigit);
@@ -220,37 +223,38 @@ display_light_status();
 
 int format_hour(int increment){
   if (increment>0){
-    if (rtc.getTime().hour>22){ // it means now is 23:XX I have to set 00:XX
+    //quanto è chiamato format_hour?
+    if (rtc.hour()>22){ // it means now is 23:XX I have to set 00:XX
       return 0;
     }
     else{
-      return rtc.getTime().hour+1;
+      return rtc.hour()+1;
     }
   }
   else{
-        if (rtc.getTime().hour==0){ // it means now is 00:XX I have to set 23:XX
+        if (rtc.hour()==0){ // it means now is 00:XX I have to set 23:XX
       return 23;
     }
     else{
-      return rtc.getTime().hour-1;
+      return rtc.hour()-1;
     }
   }
 }
 int format_minutes(int increment){
 if (increment>0){
-    if (rtc.getTime().min==59){ // it means now is XX:59I have to set XX:00
+    if (rtc.minute()==59){ // it means now is XX:59I have to set XX:00
       return 0;
     }
     else{
-      return rtc.getTime().min+1;
+      return rtc.minute()+1;
     }
   }
   else{
-        if (rtc.getTime().min==0){ // it means now is XX:00 I have to set XX:59
+        if (rtc.minute()==0){ // it means now is XX:00 I have to set XX:59
       return 59;
     }
     else{
-      return rtc.getTime().min-1;
+      return rtc.minute()-1;
     }
   }
 
@@ -259,18 +263,18 @@ if (increment>0){
 
 
 void chek_and_set_time_up(short int startingDigit){
+  rtc.refresh();
   if (check_right()){
-    t=rtc.getTime();
-    min=t.min;
-    hour=t.hour;
-    sec=t.sec;
+    min=rtc.minute();
+    hour=rtc.hour();
+    sec=rtc.second();
     if (startingDigit==0){ // setting hour
       int new_hour= format_hour(1);
-      rtc.setTime(new_hour,min,sec); // set time hh:mm:ss
+      rtc.set(sec, min, new_hour, 5, 13, 1, 22);
     }
     else if (startingDigit==1){ // setting minutes
       int new_minute=format_minutes(1);
-      rtc.setTime(hour,new_minute,sec);
+      rtc.set(sec, new_minute, hour, 5, 13, 1, 22);
     }
     delay(300);
   }
@@ -345,18 +349,18 @@ display_light_status();
 }
 
 void chek_and_set_time_down(short int startingDigit){
+  rtc.refresh();
   if (check_left()){
-    t=rtc.getTime();
-    min=t.min;
-    hour=t.hour;
-    sec=t.sec;
+    min=rtc.minute();
+    hour=rtc.hour();
+    sec=rtc.second();
     if (startingDigit==0){ // setting hour
       int new_hour= format_hour(-1);
-      rtc.setTime(new_hour,min,sec); // set time hh:mm:ss
+      rtc.set(sec,min,new_hour, 5, 13, 1, 22); // set time hh:mm:ss
     }
     else if (startingDigit==1){ // setting minutes
       int new_minute=format_minutes(-1);
-      rtc.setTime(hour,new_minute,sec);
+      rtc.set(sec,new_minute,hour, 5, 13, 1, 22);
     }
 
     delay(300);
@@ -373,10 +377,9 @@ lc.clearDisplay(0);
 long unsigned int now=millis();
 unsigned int time_on=150;
 while(millis()-now<time_on){
-  t=rtc.getTime();
-  sec=t.sec;
-  min=t.min;
-  hour=t.hour;
+  sec=rtc.second();
+  min=rtc.minute();
+  hour=rtc.hour();
   if (startingDigit==0){
     displayNumber((unsigned short)2,min,true);
   }
@@ -446,20 +449,18 @@ void set_light(){
 }
 
 void displayCurrentTime(){
-  t=rtc.getTime();
-  sec=t.sec;
-  min=t.min;
-  hour=t.hour;
+  sec=rtc.second();
+  min=rtc.minute();
+  hour=rtc.hour();
   displayNumber((unsigned short)0,hour,true); 
   displayNumber((unsigned short)2,min,true);
   displayNumber((unsigned short)4,sec,false);
 }
 
 void displayCurrentTimeWithMillis(bool firstEnter){
-  t=rtc.getTime();
-  sec=t.sec;
-  min=t.min;
-  hour=t.hour;
+  sec=rtc.second();
+  min=rtc.minute();
+  hour=rtc.hour();
 
   if (firstEnter){
     startingMillis=millis();
@@ -477,9 +478,8 @@ void displayCurrentTimeWithMillis(bool firstEnter){
   
 }
  void displayTemperatureAndTime(){
-  t=rtc.getTime();
-  min=t.min;
-  hour=t.hour;
+  min=rtc.minute();
+  hour=rtc.hour();
   displayNumber((unsigned short)0,hour,true); 
   displayNumber((unsigned short)2,min,false);
 
@@ -589,13 +589,15 @@ void displayCurrentTimeWithMillis(bool firstEnter){
 
 void loop()
 {
-  unsigned short currentSecond = rtc.getTime().sec;
+  rtc.refresh();
+  unsigned short currentSecond = rtc.second();
   while(1){
+  rtc.refresh();
   set_light_status();
   if (state == 0)
     { // initial state, normal clock
       // display current time
-      if (rtc.getTime().sec==currentSecond)
+      if (rtc.second()==currentSecond)
         {
           // check state pin, luminosity, and other settings
           displayCurrentTime();
@@ -606,11 +608,11 @@ void loop()
         {
         displayCurrentTime();
         }
-        currentSecond=rtc.getTime().sec;
+        currentSecond=rtc.second();
 
     }
     else if (state==1){
-      if (rtc.getTime().sec==currentSecond) // the second has not yet changed
+      if (rtc.second()==currentSecond) // the second has not yet changed
         {
       displayCurrentTimeWithMillis(firstEnter); // first enter =1 by default
       firstEnter=0;
@@ -622,7 +624,7 @@ void loop()
         firstEnter=1;
         displayCurrentTimeWithMillis(firstEnter); // first enter =1 by default
         firstEnter=0;
-        currentSecond=rtc.getTime().sec;
+        currentSecond=rtc.second();
         }
         
 
