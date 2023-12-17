@@ -1,12 +1,11 @@
 #include <Arduino.h>
 #include <DHT.h>
-#include "uRTCLib.h"
 #include "SevenSegmentDisplay.h"
+#include "RtClock.h"
 void chek_and_set_time_down(short int );
 void chek_and_set_time_up(short int );
 void check_and_set_light_up();
 void check_and_set_light_down();
-uRTCLib rtc;
 
 
 
@@ -31,11 +30,9 @@ short int central_button_counter=0; // once the hour and minutes has been set yo
 float oldTemp=0;
 int oldHum=0;
 bool firstEnter=1; // used in millis function to sync arduino millis and current second
-int light_status=12; // 0=auto
-int number_of_light_mode=15;
 
 SevenSegmentDisplay display;
-
+RtClock rtClock;
 
 /*
   overloading of a method print to easily debug the code    
@@ -80,9 +77,7 @@ void setup() {
   pinMode(rightButton,INPUT);
   pinMode(centerButton,INPUT);
   pinMode(A2,INPUT);
-  URTCLIB_WIRE.begin();
   // for example to set January 13 2022 at 12:56 you would call:
-  rtc.set_rtc_address(0x68);
   display.init();
 
 
@@ -183,10 +178,8 @@ void blink_time_on(short int startingDigit){
   long unsigned int now=millis();
   unsigned int time_on=1000;
   while(millis()-now<time_on){
-    rtc.refresh();
-    sec=rtc.second();
-    min=rtc.minute();
-    hour=rtc.hour();
+    min=rtClock.getMinute();
+    hour=rtClock.getHour();
     display.displayNumber((unsigned short)0,hour,false); 
     display.displayNumber((unsigned short)2,min,true);
     chek_and_set_time_up(startingDigit);
@@ -194,75 +187,35 @@ void blink_time_on(short int startingDigit){
   }
 }
 
-void blink_light_on(short int startingDigit){
-  long unsigned int now=millis();
-  unsigned int time_on=1000;
-  while(millis()-now<time_on){
-display.displayLightStatus();
+void blink_light_on(short int startingDigit)
+{
+  long unsigned int now = millis();
+  unsigned int time_on = 1000;
+  while (millis() - now < time_on)
+  {
+    display.displayLightStatus();
     check_and_set_light_up();
     check_and_set_light_down();
   }
 }
 
-int format_hour(int increment){
-  if (increment>0){
-    //quanto è chiamato format_hour?
-    if (rtc.hour()>22){ // it means now is 23:XX I have to set 00:XX
-      return 0;
+void chek_and_set_time_up(short int startingDigit)
+{
+  if (check_right())
+  {
+    if (startingDigit == 0)
+    { // setting hour
+      print("aumento ora");
+      rtClock.incrementHour();
     }
-    else{
-      return rtc.hour()+1;
-    }
-  }
-  else{
-        if (rtc.hour()==0){ // it means now is 00:XX I have to set 23:XX
-      return 23;
-    }
-    else{
-      return rtc.hour()-1;
-    }
-  }
-}
-int format_minutes(int increment){
-if (increment>0){
-    if (rtc.minute()==59){ // it means now is XX:59I have to set XX:00
-      return 0;
-    }
-    else{
-      return rtc.minute()+1;
-    }
-  }
-  else{
-        if (rtc.minute()==0){ // it means now is XX:00 I have to set XX:59
-      return 59;
-    }
-    else{
-      return rtc.minute()-1;
-    }
-  }
-
-
-}
-
-
-void chek_and_set_time_up(short int startingDigit){
-  rtc.refresh();
-  if (check_right()){
-    min=rtc.minute();
-    hour=rtc.hour();
-    sec=rtc.second();
-    if (startingDigit==0){ // setting hour
-      int new_hour= format_hour(1);
-      rtc.set(sec, min, new_hour, 5, 13, 1, 22);
-    }
-    else if (startingDigit==1){ // setting minutes
-      int new_minute=format_minutes(1);
-      rtc.set(sec, new_minute, hour, 5, 13, 1, 22);
+    else if (startingDigit == 1)
+    { // setting minutes
+      print("aumento minuti");
+      rtClock.incrementMinute();
     }
     delay(300);
   }
   check_center();
-
 }
 
 void updateLight()
@@ -289,55 +242,49 @@ void check_and_set_light_down()
   check_center();
 }
 
-void chek_and_set_time_down(short int startingDigit){
-  rtc.refresh();
-  if (check_left()){
-    min=rtc.minute();
-    hour=rtc.hour();
-    sec=rtc.second();
-    if (startingDigit==0){ // setting hour
-      int new_hour= format_hour(-1);
-      rtc.set(sec,min,new_hour, 5, 13, 1, 22); // set time hh:mm:ss
+void chek_and_set_time_down(short int startingDigit)
+{
+  if (check_left())
+  {
+    if (startingDigit == 0)
+    { // setting hour
+      rtClock.decreaseHour();
     }
-    else if (startingDigit==1){ // setting minutes
-      int new_minute=format_minutes(-1);
-      rtc.set(sec,new_minute,hour, 5, 13, 1, 22);
+    else if (startingDigit == 1)
+    { // setting minutes
+      rtClock.decreaseMinute();
     }
 
     delay(300);
-    
   }
-      check_center();
-
+  check_center();
 }
 
-
-void  display_noting(short int startingDigit){
-// display only the time NOT on the starting digit i.e if startingDigit=0 the function displays the minutes but not the hours
-display.clear();
-long unsigned int now=millis();
-unsigned int time_on=150;
-while(millis()-now<time_on){
-  sec=rtc.second();
-  min=rtc.minute();
-  hour=rtc.hour();
-  if (startingDigit==0){
-    display.displayNumber((unsigned short)2,min,true);
+void display_noting(short int startingDigit)
+{
+  // display only the time NOT on the starting digit i.e if startingDigit=0 the function displays the minutes but not the hours
+  display.clear();
+  long unsigned int now = millis();
+  unsigned int time_on = 150;
+  while (millis() - now < time_on)
+  {
+    min = rtClock.getMinute();
+    hour = rtClock.getHour();
+    if (startingDigit == 0)
+    {
+      display.displayNumber((unsigned short)2, min, true);
+    }
+    else if (startingDigit == 1)
+    {
+      display.displayNumber((unsigned short)0, hour, true);
+    }
+    chek_and_set_time_up(startingDigit);
+    chek_and_set_time_down(startingDigit);
   }
-  else if (startingDigit==1){
-    display.displayNumber((unsigned short)0,hour,true); 
-  }
-  chek_and_set_time_up(startingDigit);
-  chek_and_set_time_down(startingDigit);
-
 }
-}
-
-
 
 void blink_off(short int startingDigit){
   display_noting(startingDigit);
-
 }
 
 void blink_light_off() {
@@ -389,98 +336,98 @@ void set_light(){
 
 }
 
-void displayCurrentTime(){
-  sec=rtc.second();
-  min=rtc.minute();
-  hour=rtc.hour();
-  display.displayNumber((unsigned short)0,hour,true); 
-  display.displayNumber((unsigned short)2,min,true);
-  display.displayNumber((unsigned short)4,sec,false);
+void displayCurrentTime()
+{
+  sec = rtClock.getSecond();
+  min = rtClock.getMinute();
+  hour = rtClock.getHour();
+  display.displayNumber((unsigned short)0, hour, true);
+  display.displayNumber((unsigned short)2, min, true);
+  display.displayNumber((unsigned short)4, sec, false);
 }
 
-void displayCurrentTimeWithMillis(bool firstEnter){
-  sec=rtc.second();
-  min=rtc.minute();
-  hour=rtc.hour();
+void displayCurrentTimeWithMillis(bool firstEnter)
+{
+  sec = rtClock.getSecond();
+  min = rtClock.getMinute();
+  hour = rtClock.getHour();
 
-  if (firstEnter){
-    startingMillis=millis();
-    display.displayNumber((unsigned short)6,(unsigned short)0,false);
-    currentMills=millis();
-  }
-  else{
-    currentMills=millis()-startingMillis; 
-    display.displayNumber((unsigned short)6,(unsigned short)currentMills/10,false);
-  }
-  display.displayNumber((unsigned short)0,hour,true); 
-  display.displayNumber((unsigned short)2,min,true);
-  display.displayNumber((unsigned short)4,sec,false);
-  checkButtons();
-  
-}
- void displayTemperatureAndTime(){
-  min=rtc.minute();
-  hour=rtc.hour();
-  display.displayNumber((unsigned short)0,hour,true); 
-  display.displayNumber((unsigned short)2,min,false);
-
-  if (oldTemp< 1){ // if this is the first time entering the method just print the instant temperature
-    float temp= dht.readTemperature();
-    int integer= floor(temp); 
-    int decimal= int((temp-integer)*100);
-    Serial.print("old: ");
-    Serial.println(oldTemp);
-    display.displayNumber((unsigned short)5,integer,true);
-    display.displayNumber((unsigned short)7,decimal,false);
-    oldTemp=temp;
+  if (firstEnter)
+  {
+    startingMillis = millis();
+    display.displayNumber((unsigned short)6, (unsigned short)0, false);
+    currentMills = millis();
   }
   else
   {
-    int integer= floor(oldTemp); 
-    int decimal= int((oldTemp-integer)*100);
-    display.displayNumber((unsigned short)5,integer,true);
-    display.displayNumber((unsigned short)7,decimal,false);
-    long startTime=millis();
-    float meanTemperature=dht.readTemperature();
-    int n=1;
-    while(millis()-startTime<20000 && !checkButtons()){ // update every X seconds or when a button is pressed
-      n++;
-      meanTemperature = meanTemperature*(n-1)/n + meanTemperature/n; // iterative mean
-      delay(10);
+    currentMills = millis() - startingMillis;
+    display.displayNumber((unsigned short)6, (unsigned short)currentMills / 10, false);
+  }
+  display.displayNumber((unsigned short)0, hour, true);
+  display.displayNumber((unsigned short)2, min, true);
+  display.displayNumber((unsigned short)4, sec, false);
+  checkButtons();
+}
+void displayTemperatureAndTime()
+{
+  min = rtClock.getMinute();
+  hour = rtClock.getHour();
+  display.displayNumber((unsigned short)0, hour, true);
+  display.displayNumber((unsigned short)2, min, false);
 
+  if (oldTemp < 1)
+  { // if this is the first time entering the method just print the instant temperature
+    float temp = dht.readTemperature();
+    int integer = floor(temp);
+    int decimal = int((temp - integer) * 100);
+    Serial.print("old: ");
+    Serial.println(oldTemp);
+    display.displayNumber((unsigned short)5, integer, true);
+    display.displayNumber((unsigned short)7, decimal, false);
+    oldTemp = temp;
+  }
+  else
+  {
+    int integer = floor(oldTemp);
+    int decimal = int((oldTemp - integer) * 100);
+    display.displayNumber((unsigned short)5, integer, true);
+    display.displayNumber((unsigned short)7, decimal, false);
+    long startTime = millis();
+    float meanTemperature = dht.readTemperature();
+    int n = 1;
+    while (millis() - startTime < 20000 && !checkButtons())
+    { // update every X seconds or when a button is pressed
+      n++;
+      meanTemperature = meanTemperature * (n - 1) / n + meanTemperature / n; // iterative mean
+      delay(10);
     }
     Serial.println(meanTemperature);
-    float temp= meanTemperature;
-    oldTemp=temp;
-    integer= floor(temp); 
-    decimal= int((temp-integer)*100);
-    display.displayNumber((unsigned short)5,integer,true);
-    display.displayNumber((unsigned short)7,decimal,false);
-
+    float temp = meanTemperature;
+    oldTemp = temp;
+    integer = floor(temp);
+    decimal = int((temp - integer) * 100);
+    display.displayNumber((unsigned short)5, integer, true);
+    display.displayNumber((unsigned short)7, decimal, false);
   }
- 
- 
+}
 
+void displayTemperatureAndHumidity()
+{
 
-
- }
- 
- void displayTemperatureAndHumidity(){
-
-   if (oldTemp < 1 || oldHum < 1)
-   { // if this is the first time entering the method just print the instant temperature
-     float temp = dht.readTemperature();
-     int hum = dht.readHumidity();
-     int integer = floor(temp);
-     int decimal = int((temp - integer) * 100);
-     display.displayNumber((unsigned short)0, integer, true);
-     display.displayNumber((int)2, (int)decimal / 10, false, false);
-     display.setChar(0, 3, 'C', false);
-     display.displayNumber((unsigned short)5, hum, false);
-     display.setChar(0, 7, 'H', false);
-     oldTemp = temp;
-     oldHum = hum;
-   }
+  if (oldTemp < 1 || oldHum < 1)
+  { // if this is the first time entering the method just print the instant temperature
+    float temp = dht.readTemperature();
+    int hum = dht.readHumidity();
+    int integer = floor(temp);
+    int decimal = int((temp - integer) * 100);
+    display.displayNumber((unsigned short)0, integer, true);
+    display.displayNumber((int)2, (int)decimal / 10, false, false);
+    display.setChar(0, 3, 'C', false);
+    display.displayNumber((unsigned short)5, hum, false);
+    display.setChar(0, 7, 'H', false);
+    oldTemp = temp;
+    oldHum = hum;
+  }
   else
   {
     int integer = floor(oldTemp);
@@ -518,19 +465,17 @@ void displayCurrentTimeWithMillis(bool firstEnter){
     display.displayNumber((unsigned short)5, hum, false);
     display.setChar(0, 7, 'H', false);
   }
- }
+}
 
 void loop()
 {
-  rtc.refresh();
-  unsigned short currentSecond = rtc.second();
+  unsigned short currentSecond = rtClock.getSecond();
   while(1){
-  rtc.refresh();
   updateLight();
   if (state == 0)
     { // initial state, normal clock
       // display current time
-      if (rtc.second()==currentSecond)
+      if (rtClock.getSecond()==currentSecond)
         {
           // check state pin, luminosity, and other settings
           displayCurrentTime();
@@ -541,11 +486,11 @@ void loop()
         {
         displayCurrentTime();
         }
-        currentSecond=rtc.second();
+        currentSecond=rtClock.getSecond();
 
     }
     else if (state==1){
-      if (rtc.second()==currentSecond) // the second has not yet changed
+      if (rtClock.getSecond()==currentSecond) // the second has not yet changed
         {
       displayCurrentTimeWithMillis(firstEnter); // first enter =1 by default
       firstEnter=0;
@@ -557,7 +502,7 @@ void loop()
         firstEnter=1;
         displayCurrentTimeWithMillis(firstEnter); // first enter =1 by default
         firstEnter=0;
-        currentSecond=rtc.second();
+        currentSecond=rtClock.getSecond();
         }
         
 
@@ -571,27 +516,19 @@ void loop()
     else if (state==3){
       displayTemperatureAndHumidity();
       checkButtons();
-
-
     }
 
-       else if (state==4){
+    else if (state==4){
      set_light();
      Serial.println(analogRead(2));
-
-
     }
+    /*
+      blinks and set hour until center button is pushed, then repeats for minute.
+      after the second push of the center button the time is set. 
+    */
     else if (state==42){ // enter time setting mode
-        //printa i minuti sempre, 
-        //tieni l'ora accesa per 1 secondo e spegnila per 0.2 secondi 
-        //quando viene ripremuto il tasto centrale vai ai minuti
-        // quando viene premuto su vai ora più, ricordando che a 24 devi cambiare.
-        // quando viene premuto giù vai meno ricordano che non puoi andare a 0
         set_time();
     }
-
-
-
   }
   }
 
