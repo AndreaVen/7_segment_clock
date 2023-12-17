@@ -12,13 +12,17 @@ class SevenSegmentDisplay {
     SevenSegmentDisplay();
     void update();
     void setLightStatus(int status);
+    int getLightStatus();
     void init();
-    void displayNumber(unsigned short startingDigit,unsigned short number,bool dp);
+    void displayNumber(unsigned short startingDigit,unsigned short number,bool dp,bool pad=true);
     void displayLightStatus();
     void clear();
     void setChar(int addr, int digit, char value, boolean dp );
-
     void setLightAuto(int lux);
+    void increaseLight();
+    void decreaseLight();
+    void updateLight(int lux);
+  
 
 };
 #endif
