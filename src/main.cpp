@@ -2,10 +2,8 @@
 #include <DHT.h>
 #include "SevenSegmentDisplay.h"
 #include "RtClock.h"
-void chek_and_set_time_down(short int );
-void chek_and_set_time_up(short int );
-void check_and_set_light_up();
-void check_and_set_light_down();
+void chekAndSetTime(short int );
+void checkAndChangeLight();
 
 
 
@@ -83,13 +81,7 @@ void setup() {
 
 }
 
-
-
-
-
-
 // check the buttons and uptade the current state (functionality of the clock)
-
 bool check_right(){
   int right = digitalRead(rightButton);
   if (right==0){
@@ -120,16 +112,20 @@ bool center = digitalRead(centerButton);
 
 
 
+/*
+the methods checks if any button has been pressed and changes the internal value accordingly
+*/
 bool checkButtons()
 {
   bool left = digitalRead(leftButton);
   bool right = digitalRead(rightButton);
   bool center = digitalRead(centerButton);
+
   if (right == 0)
   {
-    print( (String)"Right");
-    print((String)"old state= "+state);
-  display.clear();
+    print((String) "Right");
+    print((String) "old state= " + state);
+    display.clear();
     delay(300);
     if (state < maxModes)
     {
@@ -139,17 +135,17 @@ bool checkButtons()
     {
       state = 0;
     }
-        print((String)"new state= "+state);
+    print((String) "new state= " + state);
     return true;
   }
   else if (left == 0)
   {
-    print((String)"left");
-            print((String)"old state= "+state);
+    print((String) "left");
+    print((String) "old state= " + state);
 
     display.clear();
 
-        delay(300);
+    delay(300);
     if (state > 0)
     {
       state--;
@@ -158,19 +154,20 @@ bool checkButtons()
     {
       state = maxModes;
     }
-            print((String)"new state= "+state);
+    print((String) "new state= " + state);
     return true;
   }
   else if (center == 0)
   {
-      print((String)"center");
-      display.clear();
-      state=42;
-      delay(300);
-      return true;
+    print((String) "center");
+    display.clear();
+    state = 42;
+    delay(300);
+    return true;
     // enter mode that changes the current time
   }
-  else{
+  else
+  {
     return false;
   }
 }
@@ -182,8 +179,7 @@ void blink_time_on(short int startingDigit){
     hour=rtClock.getHour();
     display.displayNumber((unsigned short)0,hour,false); 
     display.displayNumber((unsigned short)2,min,true);
-    chek_and_set_time_up(startingDigit);
-    chek_and_set_time_down(startingDigit);
+    chekAndSetTime(startingDigit);
   }
 }
 
@@ -194,12 +190,11 @@ void blink_light_on(short int startingDigit)
   while (millis() - now < time_on)
   {
     display.displayLightStatus();
-    check_and_set_light_up();
-    check_and_set_light_down();
+    checkAndChangeLight();
   }
 }
 
-void chek_and_set_time_up(short int startingDigit)
+void chekAndSetTime(short int startingDigit)
 {
   if (check_right())
   {
@@ -215,35 +210,6 @@ void chek_and_set_time_up(short int startingDigit)
     }
     delay(300);
   }
-  check_center();
-}
-
-void updateLight()
-{
-  display.updateLight(analogRead(lux_pin));
-}
-
-void check_and_set_light_up()
-{
-  if (check_right())
-  {
-    display.increaseLight();
-  }
-  check_center();
-}
-
-void check_and_set_light_down()
-{
-  if (check_left())
-  {
-    display.decreaseLight();
-  }
-
-  check_center();
-}
-
-void chek_and_set_time_down(short int startingDigit)
-{
   if (check_left())
   {
     if (startingDigit == 0)
@@ -259,6 +225,30 @@ void chek_and_set_time_down(short int startingDigit)
   }
   check_center();
 }
+
+void updateLight()
+{
+  display.updateLight(analogRead(lux_pin));
+}
+
+void checkAndChangeLight()
+{
+  if (check_right())
+  {
+    display.increaseLight();
+  }
+   if (check_left())
+  {
+    display.decreaseLight();
+  }
+  check_center();
+
+
+}
+
+
+
+
 
 void display_noting(short int startingDigit)
 {
@@ -278,8 +268,7 @@ void display_noting(short int startingDigit)
     {
       display.displayNumber((unsigned short)0, hour, true);
     }
-    chek_and_set_time_up(startingDigit);
-    chek_and_set_time_down(startingDigit);
+    chekAndSetTime(startingDigit);
   }
 }
 
@@ -294,8 +283,7 @@ unsigned int time_on=150;
 while(millis()-now<time_on){
   display.setChar(0,0,'L',true);
   check_center();
-  check_and_set_light_down();
-  check_and_set_light_up();
+  checkAndChangeLight();
   } 
 }
 
